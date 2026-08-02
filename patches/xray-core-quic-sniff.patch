@@ -1,0 +1,387 @@
+# xray-core QUIC sniff compatibility patch for XrayR v0.9.4
+# Base xray-core commit: 8deb953aec3c194300150bb57d858819ed2c9966 (v1.8.20)
+# Upstream security references:
+#   1ffb8a92cd38c7ee2e8909f5dec6f5832d3bf520
+#   d9ebb9b2dc1fd41a013eb4006522234e5c4326e1
+#   ef1c165cc595aa122d284eb92547c9f5dab513fb
+#   e5a9fb752e0dcc127dd1740316c853571c16052f
+#   8f15190c230fe6975c9b18e31316c6bc494f3863
+# Compatibility adaptations:
+#   - Keep the v1.8.20 SniffQUIC API and single-packet behavior.
+#   - Replace post-v1.8.20 buf.NewWithSize/ownership APIs with the existing bytespool API plus explicit bounds.
+#   - Apply the d9ebb9b2dc sampling and CRYPTO-buffer safety semantics without importing its newer dispatcher/buffer refactor.
+#   - Keep XrayR 0.9.4 app/mydispatcher unchanged; its fixed buf.Size cache path has no equivalent NewWithSize dependency.
+#   - Add no newer xray-core protocol, configuration, panel, or routing behavior.
+diff --git a/common/protocol/quic/sniff.go b/common/protocol/quic/sniff.go
+index bf46146..940e047 100644
+--- a/common/protocol/quic/sniff.go
++++ b/common/protocol/quic/sniff.go
+@@ -29,8 +29,9 @@ func (s SniffHeader) Domain() string {
+ }
+ 
+ const (
+-	versionDraft29 uint32 = 0xff00001d
+-	version1       uint32 = 0x1
++	versionDraft29      uint32 = 0xff00001d
++	version1            uint32 = 0x1
++	maxCryptoDataLength int32  = 32767
+ )
+ 
+ var (
+@@ -46,7 +47,19 @@ var (
+ 	errNotQuicInitial = errors.New("not initial packet")
+ )
+ 
+-func SniffQUIC(b []byte) (*SniffHeader, error) {
++func SniffQUIC(b []byte) (result *SniffHeader, errReturn error) {
++	// QUIC packets are untrusted network input. Keep a final safety net for
++	// malformed packets that reach an unexpected slice operation.
++	defer func() {
++		if recover() != nil {
++			result = nil
++			errReturn = common.ErrNoClue
++		}
++	}()
++	if uint64(len(b)) > uint64(1<<31-1) {
++		return nil, common.ErrNoClue
++	}
++
+ 	buffer := buf.FromBytes(b)
+ 	typeByte, err := buffer.ReadByte()
+ 	if err != nil {
+@@ -87,21 +100,28 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
+ 		return nil, errNotQuic
+ 	}
+ 
+-	tokenLen, err := quicvarint.Read(buffer)
+-	if err != nil || tokenLen > uint64(len(b)) {
++	tokenLen, err := readShortQuicVarint(buffer)
++	if err != nil || int64(tokenLen) > int64(buffer.Len()) {
+ 		return nil, errNotQuic
+ 	}
+ 
+-	if _, err = buffer.ReadBytes(int32(tokenLen)); err != nil {
++	if _, err = buffer.ReadBytes(tokenLen); err != nil {
+ 		return nil, errNotQuic
+ 	}
+ 
+-	packetLen, err := quicvarint.Read(buffer)
++	packetLen, err := readShortQuicVarint(buffer)
+ 	if err != nil {
+ 		return nil, errNotQuic
+ 	}
+ 
+ 	hdrLen := len(b) - int(buffer.Len())
++	if packetLen < 4 {
++		return nil, errNotQuic
++	}
++	if int64(packetLen) > int64(len(b)-hdrLen) {
++		return nil, common.ErrNoClue
++	}
++	packetEnd := hdrLen + int(packetLen)
+ 
+ 	origPNBytes := make([]byte, 4)
+ 	copy(origPNBytes, b[hdrLen:hdrLen+4])
+@@ -124,7 +144,10 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
+ 	defer cache.Release()
+ 
+ 	mask := cache.Extend(int32(block.BlockSize()))
+-	block.Encrypt(mask, b[hdrLen+4:hdrLen+4+16])
++	if packetLen < int32(4+block.BlockSize()) || len(b) < hdrLen+4+block.BlockSize() {
++		return nil, errNotQuic
++	}
++	block.Encrypt(mask, b[hdrLen+4:hdrLen+4+len(mask)])
+ 	b[0] ^= mask[0] & 0xf
+ 	for i := range b[hdrLen : hdrLen+4] {
+ 		b[hdrLen+i] ^= mask[i+1]
+@@ -148,7 +171,7 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
+ 
+ 	extHdrLen := hdrLen + int(packetNumberLength)
+ 	copy(b[extHdrLen:hdrLen+4], origPNBytes[packetNumberLength:])
+-	data := b[extHdrLen : int(packetLen)+hdrLen]
++	data := b[extHdrLen:packetEnd]
+ 
+ 	key := hkdfExpandLabel(crypto.SHA256, secret, []byte{}, "quic key", 16)
+ 	iv := hkdfExpandLabel(crypto.SHA256, secret, []byte{}, "quic iv", 12)
+@@ -161,8 +184,8 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
+ 	}
+ 	buffer = buf.FromBytes(decrypted)
+ 
+-	cryptoLen := uint(0)
+-	cryptoData := bytespool.Alloc(buffer.Len())
++	cryptoLen := int32(0)
++	cryptoData := bytespool.Alloc(maxCryptoDataLength)
+ 	defer bytespool.Free(cryptoData)
+ 	for i := 0; !buffer.IsEmpty(); i++ {
+ 		frameType := byte(0x0) // Default to PADDING frame
+@@ -173,65 +196,76 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
+ 		case 0x00: // PADDING frame
+ 		case 0x01: // PING frame
+ 		case 0x02, 0x03: // ACK frame
+-			if _, err = quicvarint.Read(buffer); err != nil { // Field: Largest Acknowledged
++			if _, err = readShortQuicVarint(buffer); err != nil { // Field: Largest Acknowledged
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			if _, err = quicvarint.Read(buffer); err != nil { // Field: ACK Delay
++			if _, err = readShortQuicVarint(buffer); err != nil { // Field: ACK Delay
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			ackRangeCount, err := quicvarint.Read(buffer) // Field: ACK Range Count
++			ackRangeCount, err := readShortQuicVarint(buffer) // Field: ACK Range Count
+ 			if err != nil {
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			if _, err = quicvarint.Read(buffer); err != nil { // Field: First ACK Range
++			if _, err = readShortQuicVarint(buffer); err != nil { // Field: First ACK Range
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			for i := 0; i < int(ackRangeCount); i++ { // Field: ACK Range
+-				if _, err = quicvarint.Read(buffer); err != nil { // Field: ACK Range -> Gap
++			for i := int32(0); i < ackRangeCount; i++ { // Field: ACK Range
++				if _, err = readShortQuicVarint(buffer); err != nil { // Field: ACK Range -> Gap
+ 					return nil, io.ErrUnexpectedEOF
+ 				}
+-				if _, err = quicvarint.Read(buffer); err != nil { // Field: ACK Range -> ACK Range Length
++				if _, err = readShortQuicVarint(buffer); err != nil { // Field: ACK Range -> ACK Range Length
+ 					return nil, io.ErrUnexpectedEOF
+ 				}
+ 			}
+ 			if frameType == 0x03 {
+-				if _, err = quicvarint.Read(buffer); err != nil { // Field: ECN Counts -> ECT0 Count
++				if _, err = readShortQuicVarint(buffer); err != nil { // Field: ECN Counts -> ECT0 Count
+ 					return nil, io.ErrUnexpectedEOF
+ 				}
+-				if _, err = quicvarint.Read(buffer); err != nil { // Field: ECN Counts -> ECT1 Count
++				if _, err = readShortQuicVarint(buffer); err != nil { // Field: ECN Counts -> ECT1 Count
+ 					return nil, io.ErrUnexpectedEOF
+ 				}
+-				if _, err = quicvarint.Read(buffer); err != nil { //nolint:misspell // Field: ECN Counts -> ECT-CE Count
++				if _, err = readShortQuicVarint(buffer); err != nil { //nolint:misspell // Field: ECN Counts -> ECT-CE Count
+ 					return nil, io.ErrUnexpectedEOF
+ 				}
+ 			}
+ 		case 0x06: // CRYPTO frame, we will use this frame
+-			offset, err := quicvarint.Read(buffer) // Field: Offset
++			offset, err := readShortQuicVarint(buffer) // Field: Offset
+ 			if err != nil {
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			length, err := quicvarint.Read(buffer) // Field: Length
+-			if err != nil || length > uint64(buffer.Len()) {
++			length, err := readShortQuicVarint(buffer) // Field: Length
++			if err != nil || length > buffer.Len() {
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			if cryptoLen < uint(offset+length) {
+-				cryptoLen = uint(offset + length)
++			if offset > maxCryptoDataLength {
++				return nil, io.ErrShortBuffer
++			}
++			if length > maxCryptoDataLength-offset {
++				return nil, io.ErrShortBuffer
++			}
++			end := offset + length
++			if end > int32(len(cryptoData)) || end > int32(cap(cryptoData)) {
++				return nil, io.ErrShortBuffer
+ 			}
+-			if _, err := buffer.Read(cryptoData[offset : offset+length]); err != nil { // Field: Crypto Data
++			if cryptoLen < end {
++				wipeBytes(cryptoData[cryptoLen:end])
++				cryptoLen = end
++			}
++			if _, err := buffer.Read(cryptoData[offset:end]); err != nil { // Field: Crypto Data
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+ 		case 0x1c: // CONNECTION_CLOSE frame, only 0x1c is permitted in initial packet
+-			if _, err = quicvarint.Read(buffer); err != nil { // Field: Error Code
++			if _, err = readShortQuicVarint(buffer); err != nil { // Field: Error Code
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			if _, err = quicvarint.Read(buffer); err != nil { // Field: Frame Type
++			if _, err = readShortQuicVarint(buffer); err != nil { // Field: Frame Type
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			length, err := quicvarint.Read(buffer) // Field: Reason Phrase Length
++			length, err := readShortQuicVarint(buffer) // Field: Reason Phrase Length
+ 			if err != nil {
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+-			if _, err := buffer.ReadBytes(int32(length)); err != nil { // Field: Reason Phrase
++			if _, err := buffer.ReadBytes(length); err != nil { // Field: Reason Phrase
+ 				return nil, io.ErrUnexpectedEOF
+ 			}
+ 		default:
+@@ -249,6 +283,25 @@ func SniffQUIC(b []byte) (*SniffHeader, error) {
+ 	return &SniffHeader{domain: tlsHdr.Domain()}, nil
+ }
+ 
++func wipeBytes(b []byte) {
++	for i := range b {
++		b[i] = 0
++	}
++}
++
++// readShortQuicVarint bounds values used as packet lengths, offsets, counts,
++// or slice lengths before converting them to int32 or using them in loops.
++func readShortQuicVarint(reader io.ByteReader) (int32, error) {
++	v, err := quicvarint.Read(reader)
++	if err != nil {
++		return 0, err
++	}
++	if v > 65535 {
++		return 0, errNotQuicInitial
++	}
++	return int32(v), nil
++}
++
+ func hkdfExpandLabel(hash crypto.Hash, secret, context []byte, label string, length int) []byte {
+ 	b := make([]byte, 3, 3+6+len(label)+1+len(context))
+ 	binary.BigEndian.PutUint16(b, uint16(length))
+diff --git a/common/protocol/quic/sniff_test.go b/common/protocol/quic/sniff_test.go
+index cddb4c8..5c9f44d 100644
+--- a/common/protocol/quic/sniff_test.go
++++ b/common/protocol/quic/sniff_test.go
+@@ -1,18 +1,140 @@
+-package quic_test
++package quic
+ 
+ import (
++	"crypto"
++	"crypto/aes"
++	"encoding/binary"
+ 	"encoding/hex"
++	"io"
+ 	"testing"
+ 
+ 	"github.com/xtls/xray-core/common"
+-	"github.com/xtls/xray-core/common/protocol/quic"
++	"golang.org/x/crypto/hkdf"
+ )
+ 
+ func TestSniffQUIC(t *testing.T) {
++	// Upstream normal ClientHello sample, retained from v1.8.20.
+ 	pkt, err := hex.DecodeString("cd0000000108f1fb7bcc78aa5e7203a8f86400421531fe825b19541876db6c55c38890cd73149d267a084afee6087304095417a3033df6a81bbb71d8512e7a3e16df1e277cae5df3182cb214b8fe982ba3fdffbaa9ffec474547d55945f0fddbeadfb0b5243890b2fa3da45169e2bd34ec04b2e29382f48d612b28432a559757504d158e9e505407a77dd34f4b60b8d3b555ee85aacd6648686802f4de25e7216b19e54c5f78e8a5963380c742d861306db4c16e4f7fc94957aa50b9578a0b61f1e406b2ad5f0cd3cd271c4d99476409797b0c3cb3efec256118912d4b7e4fd79d9cb9016b6e5eaa4f5e57b637b217755daf8968a4092bed0ed5413f5d04904b3a61e4064f9211b2629e5b52a89c7b19f37a713e41e27743ea6dfa736dfa1bb0a4b2bc8c8dc632c6ce963493a20c550e6fdb2475213665e9a85cfc394da9cec0cf41f0c8abed3fc83be5245b2b5aa5e825d29349f721d30774ef5bf965b540f3d8d98febe20956b1fc8fa047e10e7d2f921c9c6622389e02322e80621a1cf5264e245b7276966eb02932584e3f7038bd36aa908766ad3fb98344025dec18670d6db43a1c5daac00937fce7b7c7d61ff4e6efd01a2bdee0ee183108b926393df4f3d74bbcbb015f240e7e346b7d01c41111a401225ce3b095ab4623a5836169bf9599eeca79d1d2e9b2202b5960a09211e978058d6fc0484eff3e91ce4649a5e3ba15b906d334cf66e28d9ff575406e1ae1ac2febafd72870b6f5d58fc5fb949cb1f40feb7c1d9ce5e71b")
+ 	common.Must(err)
+-	quicHdr, err := quic.SniffQUIC(pkt)
++	quicHdr, err := SniffQUIC(pkt)
+ 	if err != nil || quicHdr.Domain() != "www.google.com" {
+ 		t.Error("failed")
+ 	}
+ }
++
++func TestSniffQUICMalformedCryptoFrameDoesNotPanic(t *testing.T) {
++	pkt := makeTestInitialPacket([]byte{0x06, 0x80, 0x00, 0x01, 0xaa})
++
++	var (
++		header   *SniffHeader
++		err      error
++		panicked interface{}
++	)
++	func() {
++		defer func() {
++			panicked = recover()
++		}()
++		header, err = SniffQUIC(pkt)
++	}()
++
++	if panicked != nil {
++		t.Fatalf("SniffQUIC panicked on malformed CRYPTO frame: %v", panicked)
++	}
++	if header != nil {
++		t.Fatalf("expected no sniff header, got domain %q", header.Domain())
++	}
++	if err == nil {
++		t.Fatal("expected a safe parsing error")
++	}
++}
++
++func TestSniffQUICCryptoFrameLimit(t *testing.T) {
++	// 32767 is the maximum accepted CRYPTO offset; adding two bytes must be
++	// rejected before any slice operation or allocation can occur.
++	pkt := makeTestInitialPacket([]byte{0x06, 0x80, 0x00, 0x7f, 0xff, 0x02, 0xaa, 0xbb})
++
++	var (
++		header *SniffHeader
++		err    error
++	)
++	func() {
++		defer func() {
++			if recovered := recover(); recovered != nil {
++				t.Fatalf("SniffQUIC panicked on oversized CRYPTO frame: %v", recovered)
++			}
++		}()
++		header, err = SniffQUIC(pkt)
++	}()
++
++	if header != nil {
++		t.Fatalf("expected no sniff header, got domain %q", header.Domain())
++	}
++	if err != io.ErrShortBuffer {
++		t.Fatalf("expected io.ErrShortBuffer, got %v", err)
++	}
++}
++
++func TestSniffFakeQUICPacketWithInvalidPacketNumberLength(t *testing.T) {
++	// Upstream regression sample from ef1c165cc595aa122d284eb92547c9f5dab513fb.
++	pkt, err := hex.DecodeString("cb00000001081c8c6d5aeb53d54400000090709b8600000000000000000000000000000000")
++	common.Must(err)
++	if _, err = SniffQUIC(pkt); err == nil {
++		t.Fatal("expected malformed packet to be rejected")
++	}
++}
++
++func TestSniffFakeQUICPacketWithTooShortData(t *testing.T) {
++	// Upstream regression sample from ef1c165cc595aa122d284eb92547c9f5dab513fb.
++	pkt, err := hex.DecodeString("cb00000001081c8c6d5aeb53d54400000090709b86")
++	common.Must(err)
++	if _, err = SniffQUIC(pkt); err == nil {
++		t.Fatal("expected truncated packet to be rejected")
++	}
++}
++
++func FuzzSniffQUIC(f *testing.F) {
++	f.Add([]byte{0x06, 0x80, 0x00, 0x01, 0xaa})
++	f.Add([]byte{0xcb, 0x00, 0x00, 0x00, 0x01, 0x08, 0x1c, 0x8c})
++	f.Fuzz(func(t *testing.T, b []byte) {
++		defer func() {
++			if recovered := recover(); recovered != nil {
++				t.Fatalf("SniffQUIC panicked for fuzz input: %v", recovered)
++			}
++		}()
++		_, _ = SniffQUIC(b)
++	})
++}
++
++func makeTestInitialPacket(payload []byte) []byte {
++	dcid := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
++	scid := []byte{0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}
++	header := []byte{0xc0, 0, 0, 0, 1, byte(len(dcid))}
++	header = append(header, dcid...)
++	header = append(header, byte(len(scid)))
++	header = append(header, scid...)
++	header = append(header, 0) // Token Length
++	header = append(header, byte(1+len(payload)+16))
++
++	packetNumber := byte(0)
++	associatedData := append(append([]byte{}, header...), packetNumber)
++	initialSecret := hkdf.Extract(crypto.SHA256.New, dcid, quicSalt)
++	secret := hkdfExpandLabel(crypto.SHA256, initialSecret, []byte{}, "client in", crypto.SHA256.Size())
++	hpKey := hkdfExpandLabel(crypto.SHA256, secret, []byte{}, "quic hp", initialSuite.KeyLen)
++	key := hkdfExpandLabel(crypto.SHA256, secret, []byte{}, "quic key", 16)
++	iv := hkdfExpandLabel(crypto.SHA256, secret, []byte{}, "quic iv", 12)
++	cipher := AEADAESGCMTLS13(key, iv)
++	nonce := make([]byte, cipher.NonceSize())
++	binary.BigEndian.PutUint64(nonce[len(nonce)-8:], uint64(packetNumber))
++	ciphertext := cipher.Seal(nil, nonce, payload, associatedData)
++	packet := append(associatedData, ciphertext...)
++
++	hpBlock, err := aes.NewCipher(hpKey)
++	if err != nil {
++		panic(err)
++	}
++	mask := make([]byte, hpBlock.BlockSize())
++	hpBlock.Encrypt(mask, packet[len(header)+1+3:len(header)+1+3+16])
++	packet[0] ^= mask[0] & 0xf
++	packet[len(header)] ^= mask[1]
++	return packet
++}

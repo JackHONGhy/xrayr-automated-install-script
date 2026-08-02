@@ -1,104 +1,57 @@
-# XrayR Automated Install Script
+# XrayR automated install script
 
-这个项目用于保存一份可直接恢复安装的 XrayR 0.9.4 运行包，并提供一键安装脚本。
+This repository provides ready-to-install Linux packages for XrayR `v0.9.4`.
+It is a packaged runtime repository, not the upstream XrayR source repository.
 
-它不是 XrayR 官方源码仓库，而是一个已经整理好的运行环境备份包，适合把 XrayR 快速安装到新的 Linux 服务器上。
+## QUIC-sniff panic fix release
 
-## 支持架构
+The current packages are `xrayr-0.9.4-quicfix.1`. They retain XrayR
+`v0.9.4` at commit `944e8cd6a8376d6daa86e9e445b8afb8264c0b33` and retain
+xray-core `v1.8.20` at commit `8deb953aec3c194300150bb57d858819ed2c9966`.
 
-- Linux amd64 / x86_64
-- Linux arm64 / aarch64
+Only the QUIC sniffer's malformed-packet safety checks were backported. The
+packages reject unsafe QUIC lengths and CRYPTO-frame ranges instead of allowing
+a malformed Initial packet to panic the process. Routing, panels, inbound and
+outbound protocols, configuration formats, the systemd service, and the
+manager script are unchanged.
 
-安装脚本会自动读取服务器架构，并下载对应版本：
+Each package contains `usr/local/XrayR/BUILD-INFO` with the release marker,
+source revisions, patch digest, Go version, and build timestamp.
 
-- `x86_64` / `amd64` 使用 `xrayr-0.9.4-linux-amd64-default-config.tar.gz`
-- `aarch64` / `arm64` 使用 `xrayr-0.9.4-linux-arm64-default-config.tar.gz`
+## Supported architectures
 
-## 一键安装
+- Linux amd64 / x86_64: `xrayr-0.9.4-linux-amd64-default-config.tar.gz`
+- Linux arm64 / aarch64: `xrayr-0.9.4-linux-arm64-default-config.tar.gz`
 
-在目标服务器上使用 root 用户运行：
+The installer keeps its existing automatic architecture detection and SHA-256
+verification.
+
+## Install
+
+On the target Linux server, run the existing installation command as root:
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/JackHONGhy/xrayr-automated-install-script/master/install.sh)
 ```
 
-脚本会自动完成：
+The script downloads the matching archive, verifies its SHA-256 digest,
+extracts `/usr/local/XrayR` and `/etc/XrayR`, installs `XrayR.service`, and
+installs the existing `xrayr` manager command.
 
-- 检测当前系统 CPU 架构
-- 显示识别到的系统架构和即将安装的对应架构版本
-- 下载对应架构的 XrayR 运行包
-- 校验运行包 SHA256
-- 解压文件到 `/usr/local/XrayR` 和 `/etc/XrayR`
-- 安装 `XrayR.service`
-- 安装 `XrayR` / `xrayr` 管理命令
-- 设置 systemd 开机自启
+## Package checksums
 
-## 安装后配置
+- amd64: `b4d7f1994d90978b1d2554f41f65a4faee6fd17ad4a25c21e769ddd3a10d3c60`
+- arm64: `af28b0e703e4b977d1a116c01091383ff867c7ef2b75b640c287bd7851eac91a`
 
-安装完成后，先编辑配置文件：
+## Configuration and management
 
-```bash
-nano /etc/XrayR/config.yml
-```
+The default configuration remains `/etc/XrayR/config.yml`; this release does
+not overwrite a user's configuration beyond the installer's original behavior.
+After configuring the node, use the existing `xrayr` command or normal systemd
+commands on that server to manage the service.
 
-配置完成后启动服务：
+## Rebuild
 
-```bash
-systemctl start XrayR
-```
-
-查看运行状态：
-
-```bash
-systemctl status XrayR --no-pager -l
-```
-
-查看日志：
-
-```bash
-journalctl -u XrayR.service -e --no-pager -f
-```
-
-也可以使用管理命令：
-
-```bash
-xrayr
-```
-
-## 本项目做过的修改
-
-- 从原来的单 amd64 安装包扩展为 amd64 + arm64 双架构安装包
-- 新增 ARM64 / AArch64 运行包
-- 修改 `install.sh`，自动识别 `x86_64/amd64` 和 `aarch64/arm64`
-- 为不同架构配置独立 SHA256 校验
-- 保留原来的 XrayR 管理脚本行为，让 `xrayr` 命令进入管理菜单
-- 保留 systemd 服务方式，服务入口为 `/usr/local/XrayR/XrayR --config /etc/XrayR/config.yml`
-
-## 文件说明
-
-- `install.sh`：一键安装脚本，自动识别架构
-- `xrayr-0.9.4-linux-amd64-default-config.tar.gz`：Linux amd64 运行包
-- `xrayr-0.9.4-linux-arm64-default-config.tar.gz`：Linux arm64 运行包
-- `xrayr-manager.sh`：XrayR 管理菜单脚本
-
-## 校验值
-
-- amd64 SHA256：`2376ab435eee70e31b9553423865f37289b3e438bb79f01f90f7b49ea91825ff`
-- arm64 SHA256：`43fdc96a9ff6362bbf3d917ff5adcfb856e67d3d44615a5bed6cf6ea84e30e64`
-
-## 手动恢复
-
-如果不使用一键脚本，也可以手动解压对应架构的包：
-
-```bash
-tar -xzf xrayr-0.9.4-linux-amd64-default-config.tar.gz -C /
-systemctl daemon-reload
-systemctl enable XrayR
-systemctl start XrayR
-```
-
-ARM64 服务器请把压缩包文件名换成：
-
-```bash
-xrayr-0.9.4-linux-arm64-default-config.tar.gz
-```
+See [BUILDING.md](BUILDING.md) for the fixed source revisions, the checked-in
+QUIC patch, Linux build requirements, and reproducible rebuild command. The
+release build script is [scripts/build-xrayr.sh](scripts/build-xrayr.sh).

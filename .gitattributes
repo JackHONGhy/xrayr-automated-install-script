@@ -1,2 +1,7 @@
 *.sh text eol=lf
 *.md text eol=lf
+
+# A unified diff intentionally contains context lines beginning with a marker
+# space followed by Go indentation. Do not treat that patch payload as source
+# whitespace when running git diff --check.
+patches/xray-core-quic-sniff.patch -whitespace

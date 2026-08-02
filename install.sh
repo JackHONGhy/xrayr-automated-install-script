@@ -22,12 +22,12 @@ SYSTEM_ARCH="$(uname -m)"
 case "${SYSTEM_ARCH}" in
   x86_64|amd64)
     ARCHIVE="xrayr-0.9.4-linux-amd64-default-config.tar.gz"
-    SHA256="2376ab435eee70e31b9553423865f37289b3e438bb79f01f90f7b49ea91825ff"
+    SHA256="b4d7f1994d90978b1d2554f41f65a4faee6fd17ad4a25c21e769ddd3a10d3c60"
     ARCH_NAME="linux-amd64"
     ;;
   aarch64|arm64)
     ARCHIVE="xrayr-0.9.4-linux-arm64-default-config.tar.gz"
-    SHA256="43fdc96a9ff6362bbf3d917ff5adcfb856e67d3d44615a5bed6cf6ea84e30e64"
+    SHA256="af28b0e703e4b977d1a116c01091383ff867c7ef2b75b640c287bd7851eac91a"
     ARCH_NAME="linux-arm64"
     ;;
   *)
