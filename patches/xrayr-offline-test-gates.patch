@@ -1,0 +1,197 @@
+diff --git a/api/bunpanel/bunpanel_test.go b/api/bunpanel/bunpanel_test.go
+--- a/api/bunpanel/bunpanel_test.go
++++ b/api/bunpanel/bunpanel_test.go
+@@ -1,10 +1,18 @@
+ package bunpanel_test
+ 
+ import (
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/api"
+ 	"github.com/XrayR-project/XrayR/api/bunpanel"
+ )
+ 
++func TestMain(m *testing.M) {
++	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
++		return
++	}
++	os.Exit(m.Run())
++}
++
+ func CreateClient() api.API {
+diff --git a/api/gov2panel/gov2panel_test.go b/api/gov2panel/gov2panel_test.go
+--- a/api/gov2panel/gov2panel_test.go
++++ b/api/gov2panel/gov2panel_test.go
+@@ -1,10 +1,18 @@
+ package gov2panel_test
+ 
+ import (
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/api"
+ 	"github.com/XrayR-project/XrayR/api/gov2panel"
+ )
+ 
++func TestMain(m *testing.M) {
++	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
++		return
++	}
++	os.Exit(m.Run())
++}
++
+ func CreateClient() api.API {
+diff --git a/api/pmpanel/pmpanel_test.go b/api/pmpanel/pmpanel_test.go
+--- a/api/pmpanel/pmpanel_test.go
++++ b/api/pmpanel/pmpanel_test.go
+@@ -1,11 +1,19 @@
+ package pmpanel_test
+ 
+ import (
+ 	"fmt"
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/api"
+ 	"github.com/XrayR-project/XrayR/api/pmpanel"
+ )
+ 
++func TestMain(m *testing.M) {
++	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
++		return
++	}
++	os.Exit(m.Run())
++}
++
+ func CreateClient() api.API {
+diff --git a/api/proxypanel/proypanel_test.go b/api/proxypanel/proypanel_test.go
+--- a/api/proxypanel/proypanel_test.go
++++ b/api/proxypanel/proypanel_test.go
+@@ -1,11 +1,19 @@
+ package proxypanel_test
+ 
+ import (
+ 	"fmt"
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/api"
+ 	"github.com/XrayR-project/XrayR/api/proxypanel"
+ )
+ 
++func TestMain(m *testing.M) {
++	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
++		return
++	}
++	os.Exit(m.Run())
++}
++
+ func CreateClient() api.API {
+diff --git a/api/sspanel/sspanel_test.go b/api/sspanel/sspanel_test.go
+--- a/api/sspanel/sspanel_test.go
++++ b/api/sspanel/sspanel_test.go
+@@ -1,11 +1,19 @@
+ package sspanel_test
+ 
+ import (
+ 	"fmt"
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/api"
+ 	"github.com/XrayR-project/XrayR/api/sspanel"
+ )
+ 
++func TestMain(m *testing.M) {
++	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
++		return
++	}
++	os.Exit(m.Run())
++}
++
+ func CreateClient() api.API {
+diff --git a/api/v2raysocks/v2raysocks_test.go b/api/v2raysocks/v2raysocks_test.go
+--- a/api/v2raysocks/v2raysocks_test.go
++++ b/api/v2raysocks/v2raysocks_test.go
+@@ -1,10 +1,18 @@
+ package v2raysocks_test
+ 
+ import (
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/api"
+ 	"github.com/XrayR-project/XrayR/api/v2raysocks"
+ )
+ 
++func TestMain(m *testing.M) {
++	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
++		return
++	}
++	os.Exit(m.Run())
++}
++
+ func CreateClient() api.API {
+diff --git a/common/mylego/lego_test.go b/common/mylego/lego_test.go
+--- a/common/mylego/lego_test.go
++++ b/common/mylego/lego_test.go
+@@ -1,6 +1,7 @@
+ package mylego_test
+ 
+ import (
++	"os"
+ 	"testing"
+ 
+ 	"github.com/XrayR-project/XrayR/common/mylego"
+@@ -14,4 +15,5 @@ func TestLegoClient(t *testing.T) {
+ }
+ 
+ func TestLegoDNSCert(t *testing.T) {
++	skipWithoutLegoIntegration(t)
+ 	lego, err := mylego.New(&mylego.CertConfig{
+@@ -37,4 +39,5 @@ func TestLegoDNSCert(t *testing.T) {
+ }
+ 
+ func TestLegoHTTPCert(t *testing.T) {
++	skipWithoutLegoIntegration(t)
+ 	lego, err := mylego.New(&mylego.CertConfig{
+@@ -55,4 +58,5 @@ func TestLegoHTTPCert(t *testing.T) {
+ }
+ 
+ func TestLegoRenewCert(t *testing.T) {
++	skipWithoutLegoIntegration(t)
+ 	lego, err := mylego.New(&mylego.CertConfig{
+@@ -85,2 +89,9 @@ func TestLegoRenewCert(t *testing.T) {
+ 	t.Log(ok)
+ }
++
++func skipWithoutLegoIntegration(t *testing.T) {
++	t.Helper()
++	if os.Getenv("XRAYR_RUN_LEGO_INTEGRATION") != "1" {
++		t.Skip("set XRAYR_RUN_LEGO_INTEGRATION=1 to run ACME integration tests")
++	}
++}
+diff --git a/service/controller/controller_test.go b/service/controller/controller_test.go
+--- a/service/controller/controller_test.go
++++ b/service/controller/controller_test.go
+@@ -19,4 +19,7 @@ import (
+ )
+ 
+ func TestController(t *testing.T) {
++	if os.Getenv("XRAYR_RUN_CONTROLLER_INTEGRATION") != "1" {
++		t.Skip("set XRAYR_RUN_CONTROLLER_INTEGRATION=1 to run controller integration test")
++	}
+ 	serverConfig := &conf.Config{
+diff --git a/service/controller/inboundbuilder_test.go b/service/controller/inboundbuilder_test.go
+--- a/service/controller/inboundbuilder_test.go
++++ b/service/controller/inboundbuilder_test.go
+@@ -76,5 +76,7 @@ func TestBuildSS(t *testing.T) {
+ 		TransportProtocol: "tcp",
+ 		Host:              "test.test.tk",
+ 		Path:              "v2ray",
+ 		EnableTLS:         false,
++		CypherMethod:      "aes-128-gcm",
++		ServerKey:         "test-password",
+ 	}
+ 	}

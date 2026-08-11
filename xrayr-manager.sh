@@ -6,6 +6,10 @@ yellow='\033[0;33m'
 plain='\033[0m'
 
 version="v1.0.0"
+custom_repo="${XRAYR_REPO:-JackHONGhy/xrayr-automated-install-script}"
+custom_branch="${XRAYR_BRANCH:-master}"
+custom_build_id="xrayr-0.9.4-quicfix.1-online.1"
+custom_installer_url="${XRAYR_INSTALLER_URL:-https://raw.githubusercontent.com/${custom_repo}/${custom_branch}/install.sh}"
 
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误: ${plain} 必须使用root用户运行此脚本！\n" && exit 1
@@ -83,9 +87,28 @@ before_show_menu() {
     show_menu
 }
 
+run_custom_installer() {
+    local installer
+    local status
+    installer=$(mktemp)
+    if ! curl -fLsS --retry 3 --connect-timeout 15 -o "${installer}" "${custom_installer_url}"; then
+        echo -e "${red}自定义 XrayR 安装脚本不可用: ${custom_installer_url}${plain}" >&2
+        rm -f "${installer}"
+        return 1
+    fi
+    if ! grep -Fq "${custom_build_id}" "${installer}"; then
+        echo -e "${red}拒绝未包含定制版本标识的安装脚本: ${custom_build_id}${plain}" >&2
+        rm -f "${installer}"
+        return 1
+    fi
+    bash "${installer}" "$@"
+    status=$?
+    rm -f "${installer}"
+    return "${status}"
+}
+
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/install.sh)
-    if [[ $? == 0 ]]; then
+    if run_custom_installer; then
         if [[ $# == 0 ]]; then
             start
         else
@@ -108,8 +131,7 @@ update() {
 #        fi
 #        return 0
 #    fi
-    bash <(curl -Ls https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/install.sh) $version
-    if [[ $? == 0 ]]; then
+    if run_custom_installer "$version"; then
         echo -e "${green}更新完成，已自动重启 XrayR，请使用 XrayR log 查看运行日志${plain}"
         exit
     fi
@@ -270,14 +292,19 @@ install_bbr() {
 }
 
 update_shell() {
-    wget -O /usr/bin/XrayR -N --no-check-certificate https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/XrayR.sh
-    if [[ $? != 0 ]]; then
+    local manager_url="${XRAYR_MANAGER_URL:-https://raw.githubusercontent.com/${custom_repo}/${custom_branch}/xrayr-manager.sh}"
+    local manager_tmp
+    manager_tmp=$(mktemp)
+    if ! curl -fLsS --retry 3 --connect-timeout 15 -o "${manager_tmp}" "${manager_url}" || ! grep -Fq "${custom_build_id}" "${manager_tmp}"; then
+        rm -f "${manager_tmp}"
         echo ""
-        echo -e "${red}下载脚本失败，请检查本机能否连接 Github${plain}"
+        echo -e "${red}下载定制管理脚本失败或版本标识不匹配${plain}"
         before_show_menu
     else
+        /usr/bin/install -m 0755 "${manager_tmp}" /usr/bin/XrayR
+        rm -f "${manager_tmp}"
         chmod +x /usr/bin/XrayR
-        echo -e "${green}升级脚本成功，请重新运行脚本${plain}" && exit 0
+        echo -e "${green}定制管理脚本升级成功，请重新运行脚本${plain}" && exit 0
     fi
 }
 
@@ -387,7 +414,7 @@ show_usage() {
 show_menu() {
     echo -e "
   ${green}XrayR 后端管理脚本，${plain}${red}不适用于docker${plain}
---- https://github.com/XrayR-project/XrayR ---
+--- https://github.com/${custom_repo} ---
   ${green}0.${plain} 修改配置
 ————————————————
   ${green}1.${plain} 安装 XrayR

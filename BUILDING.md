@@ -1,13 +1,16 @@
-# Building the XrayR 0.9.4 QUIC-sniff fix
+# Building the XrayR 0.9.4 customized QUIC-sniff and online-device fix
 
-This repository publishes XrayR `0.9.4` packages with a narrowly scoped patch to
-the bundled xray-core QUIC sniffer. It does not upgrade xray-core.
+This repository publishes XrayR `0.9.4` packages from fixed source revisions.
+It retains the existing xray-core QUIC safety patch and adds a separate
+NewV2board online-device patch. A third, test-only patch gates historical
+external-panel/ACME/controller tests behind explicit environment variables. It
+does not upgrade xray-core or replace the customized XrayR with V2bX.
 
 Fixed source revisions:
 
 - XrayR: `944e8cd6a8376d6daa86e9e445b8afb8264c0b33`
 - xray-core: `8deb953aec3c194300150bb57d858819ed2c9966` (`v1.8.20`)
-- Patch marker: `xrayr-0.9.4-quicfix.1`
+- Patch marker: `xrayr-0.9.4-quicfix.1-online.1`
 
 The patch is based on the safety changes in these official commits:
 
@@ -23,6 +26,14 @@ v1.8.20 API and implements equivalent safety with the existing `bytespool` and
 explicit bounds. The later dispatcher change is not copied into XrayR's
 `app/mydispatcher`: XrayR 0.9.4 uses the older fixed-size `buf.Size` cache path.
 
+`patches/xrayr-newv2board-online-device.patch` is generated against the fixed
+XrayR commit and is applied after the existing xray-core patch in the build
+flow. It only changes NewV2board online reporting, its httptest coverage, the
+empty-list reporting call, and privacy-safe request error logging. It does not
+parse or enforce `device_limit`. The subsequent
+`patches/xrayr-offline-test-gates.patch` changes test files only; it does not
+change runtime code or package behavior.
+
 ## Rebuild
 
 Run on a Linux build host (or WSL) with official Go, Git, GNU tar, `sha256sum`,
@@ -34,14 +45,18 @@ SOURCE_DATE_EPOCH=1754092800 \
 bash scripts/build-xrayr.sh
 ```
 
-The script clones the two fixed commits, verifies their commit IDs, applies the
-checked-in patch, adds a temporary local `replace` for the patched xray-core,
-cross-builds Linux `amd64` and `arm64`, and replaces only the binary in the
-existing package layouts. It adds `usr/local/XrayR/BUILD-INFO` containing the
-build ID, source revisions, Go version, patch SHA256, and build timestamp. The
-original configuration, database/geo files, systemd unit, manager script, and
-archive filenames are retained. It also updates the two package SHA256 values
-in `install.sh`.
+The script clones the two fixed commits (or consumes local mirrors that already
+contain those exact commits), verifies their commit IDs, applies the existing
+QUIC patch, applies the online-device patch to the final XrayR source tree,
+applies the test-only gate patch, runs `gofmt`, checks all patch markers, and
+adds a temporary local `replace` for the patched xray-core. It then cross-builds
+Linux `amd64` and `arm64`,
+and replaces only the binary in the existing package layouts. It adds
+`usr/local/XrayR/BUILD-INFO` containing the build ID, all patch SHA256 values,
+source revisions, Go version, and build timestamp. The original configuration,
+database/geo files, systemd unit, manager script, and archive filenames are
+retained. It also updates the two package SHA256 values in `install.sh` and
+regenerates `SHA256SUMS`.
 
 Set `KEEP_BUILD_ROOT=1` to retain temporary cloned sources for inspection.
 Set `GO_BIN=/path/to/go` to select a specific official Go toolchain.
@@ -54,13 +69,16 @@ local replacement used by the build script:
 ```bash
 go test ./common/protocol/quic
 go test ./app/mydispatcher
+go test ./api/newV2board/...
 go test ./...
 go test -fuzz=FuzzSniffQUIC -fuzztime=30s ./common/protocol/quic
 go vet ./...
 git diff --check
+bash scripts/check-update-protection.sh
 ```
 
-The repository's historical `service/controller/TestController` waits for an
-OS signal indefinitely; if an unfiltered `go test ./...` reaches that test, its
-timeout must be reported rather than described as a pass. The focused tests and
-fuzz target must pass before package publication.
+The NewV2board tests use `httptest`. Historical panel tests require
+`XRAYR_RUN_PANEL_INTEGRATION=1`, ACME tests require
+`XRAYR_RUN_LEGO_INTEGRATION=1`, and the controller integration test requires
+`XRAYR_RUN_CONTROLLER_INTEGRATION=1`. The default full test run is offline and
+does not contact panels, ACME, or a runtime service.
