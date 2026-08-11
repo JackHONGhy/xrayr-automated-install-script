@@ -1,7 +1,8 @@
 diff --git a/api/bunpanel/bunpanel_test.go b/api/bunpanel/bunpanel_test.go
+index ea3ad01..a45909b 100644
 --- a/api/bunpanel/bunpanel_test.go
 +++ b/api/bunpanel/bunpanel_test.go
-@@ -1,10 +1,18 @@
+@@ -1,12 +1,20 @@
  package bunpanel_test
  
  import (
@@ -12,18 +13,69 @@ diff --git a/api/bunpanel/bunpanel_test.go b/api/bunpanel/bunpanel_test.go
  	"github.com/XrayR-project/XrayR/api/bunpanel"
  )
  
-+func TestMain(m *testing.M) {
++func skipPanelIntegration(t *testing.T) {
++	t.Helper()
 +	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
-+		return
++		t.Skip("external panel integration disabled; set XRAYR_RUN_PANEL_INTEGRATION=1")
 +	}
-+	os.Exit(m.Run())
 +}
 +
  func CreateClient() api.API {
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://localhost:8080",
+@@ -19,6 +27,7 @@ func CreateClient() api.API {
+ }
+ 
+ func TestGetV2rayNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	nodeInfo, err := client.GetNodeInfo()
+ 	if err != nil {
+@@ -28,6 +37,7 @@ func TestGetV2rayNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetSSNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:668",
+ 		Key:      "qwertyuiopasdfghjkl",
+@@ -43,6 +53,7 @@ func TestGetSSNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetTrojanNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:668",
+ 		Key:      "qwertyuiopasdfghjkl",
+@@ -58,6 +69,7 @@ func TestGetTrojanNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetUserList(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	userList, err := client.GetUserList()
+@@ -69,6 +81,7 @@ func TestGetUserList(t *testing.T) {
+ }
+ 
+ func TestReportReportUserTraffic(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -90,6 +103,7 @@ func TestReportReportUserTraffic(t *testing.T) {
+ }
+ 
+ func TestGetNodeRule(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	client.Debug()
+ 	ruleList, err := client.GetNodeRule()
 diff --git a/api/gov2panel/gov2panel_test.go b/api/gov2panel/gov2panel_test.go
+index 9508e53..582b0f5 100644
 --- a/api/gov2panel/gov2panel_test.go
 +++ b/api/gov2panel/gov2panel_test.go
-@@ -1,10 +1,18 @@
+@@ -1,12 +1,20 @@
  package gov2panel_test
  
  import (
@@ -34,19 +86,69 @@ diff --git a/api/gov2panel/gov2panel_test.go b/api/gov2panel/gov2panel_test.go
  	"github.com/XrayR-project/XrayR/api/gov2panel"
  )
  
-+func TestMain(m *testing.M) {
++func skipPanelIntegration(t *testing.T) {
++	t.Helper()
 +	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
-+		return
++		t.Skip("external panel integration disabled; set XRAYR_RUN_PANEL_INTEGRATION=1")
 +	}
-+	os.Exit(m.Run())
 +}
 +
  func CreateClient() api.API {
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://localhost:8080",
+@@ -19,6 +27,7 @@ func CreateClient() api.API {
+ }
+ 
+ func TestGetV2rayNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	nodeInfo, err := client.GetNodeInfo()
+ 	if err != nil {
+@@ -28,6 +37,7 @@ func TestGetV2rayNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetSSNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:668",
+ 		Key:      "qwertyuiopasdfghjkl",
+@@ -43,6 +53,7 @@ func TestGetSSNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetTrojanNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:668",
+ 		Key:      "qwertyuiopasdfghjkl",
+@@ -58,6 +69,7 @@ func TestGetTrojanNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetUserList(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	userList, err := client.GetUserList()
+@@ -69,6 +81,7 @@ func TestGetUserList(t *testing.T) {
+ }
+ 
+ func TestReportReportUserTraffic(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -90,6 +103,7 @@ func TestReportReportUserTraffic(t *testing.T) {
+ }
+ 
+ func TestGetNodeRule(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	client.Debug()
+ 	ruleList, err := client.GetNodeRule()
 diff --git a/api/pmpanel/pmpanel_test.go b/api/pmpanel/pmpanel_test.go
+index d84102e..6aeccc3 100644
 --- a/api/pmpanel/pmpanel_test.go
 +++ b/api/pmpanel/pmpanel_test.go
-@@ -1,11 +1,19 @@
- package pmpanel_test
+@@ -2,12 +2,20 @@ package pmpanel_test
  
  import (
  	"fmt"
@@ -57,19 +159,101 @@ diff --git a/api/pmpanel/pmpanel_test.go b/api/pmpanel/pmpanel_test.go
  	"github.com/XrayR-project/XrayR/api/pmpanel"
  )
  
-+func TestMain(m *testing.M) {
++func skipPanelIntegration(t *testing.T) {
++	t.Helper()
 +	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
-+		return
++		t.Skip("external panel integration disabled; set XRAYR_RUN_PANEL_INTEGRATION=1")
 +	}
-+	os.Exit(m.Run())
 +}
 +
  func CreateClient() api.API {
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://webapi.yyds.me",
+@@ -20,6 +28,7 @@ func CreateClient() api.API {
+ }
+ 
+ func TestGetV2rayNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	client.Debug()
+ 	nodeInfo, err := client.GetNodeInfo()
+@@ -30,6 +39,7 @@ func TestGetV2rayNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetSSNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://webapi.yyds.me",
+ 		Key:      "123456",
+@@ -46,6 +56,7 @@ func TestGetSSNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetTrojanNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://webapi.yyds.me",
+ 		Key:      "123456",
+@@ -62,6 +73,7 @@ func TestGetTrojanNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetSSinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	nodeInfo, err := client.GetNodeInfo()
+@@ -72,6 +84,7 @@ func TestGetSSinfo(t *testing.T) {
+ }
+ 
+ func TestGetUserList(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	userList, err := client.GetUserList()
+@@ -83,6 +96,7 @@ func TestGetUserList(t *testing.T) {
+ }
+ 
+ func TestReportNodeStatus(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	nodeStatus := &api.NodeStatus{
+ 		CPU: 1, Mem: 1, Disk: 1, Uptime: 256,
+@@ -94,6 +108,7 @@ func TestReportNodeStatus(t *testing.T) {
+ }
+ 
+ func TestReportReportNodeOnlineUsers(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -115,6 +130,7 @@ func TestReportReportNodeOnlineUsers(t *testing.T) {
+ }
+ 
+ func TestReportReportUserTraffic(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -136,6 +152,7 @@ func TestReportReportUserTraffic(t *testing.T) {
+ }
+ 
+ func TestGetNodeRule(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	ruleList, err := client.GetNodeRule()
+@@ -147,6 +164,7 @@ func TestGetNodeRule(t *testing.T) {
+ }
+ 
+ func TestReportIllegal(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	detectResult := []api.DetectResult{
 diff --git a/api/proxypanel/proypanel_test.go b/api/proxypanel/proypanel_test.go
+index d1a5487..7431b90 100644
 --- a/api/proxypanel/proypanel_test.go
 +++ b/api/proxypanel/proypanel_test.go
-@@ -1,11 +1,19 @@
- package proxypanel_test
+@@ -2,12 +2,20 @@ package proxypanel_test
  
  import (
  	"fmt"
@@ -80,19 +264,101 @@ diff --git a/api/proxypanel/proypanel_test.go b/api/proxypanel/proypanel_test.go
  	"github.com/XrayR-project/XrayR/api/proxypanel"
  )
  
-+func TestMain(m *testing.M) {
++func skipPanelIntegration(t *testing.T) {
++	t.Helper()
 +	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
-+		return
++		t.Skip("external panel integration disabled; set XRAYR_RUN_PANEL_INTEGRATION=1")
 +	}
-+	os.Exit(m.Run())
 +}
 +
  func CreateClient() api.API {
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:8888",
+@@ -20,6 +28,7 @@ func CreateClient() api.API {
+ }
+ 
+ func TestGetV2rayNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:8888",
+ 		Key:      "naBDpLvREiwY9qPr",
+@@ -36,6 +45,7 @@ func TestGetV2rayNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetSSNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:8888",
+ 		Key:      "8VtrYVGFHL0Q9azc",
+@@ -51,6 +61,7 @@ func TestGetSSNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetTrojanNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:8888",
+ 		Key:      "kgnO2O66FmvP8rDV",
+@@ -66,6 +77,7 @@ func TestGetTrojanNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetSSinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	nodeInfo, err := client.GetNodeInfo()
+@@ -76,6 +88,7 @@ func TestGetSSinfo(t *testing.T) {
+ }
+ 
+ func TestGetUserList(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	userList, err := client.GetUserList()
+@@ -87,6 +100,7 @@ func TestGetUserList(t *testing.T) {
+ }
+ 
+ func TestReportNodeStatus(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	nodeStatus := &api.NodeStatus{
+ 		CPU: 1, Mem: 1, Disk: 1, Uptime: 256,
+@@ -98,6 +112,7 @@ func TestReportNodeStatus(t *testing.T) {
+ }
+ 
+ func TestReportReportNodeOnlineUsers(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -119,6 +134,7 @@ func TestReportReportNodeOnlineUsers(t *testing.T) {
+ }
+ 
+ func TestReportReportUserTraffic(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -140,6 +156,7 @@ func TestReportReportUserTraffic(t *testing.T) {
+ }
+ 
+ func TestGetNodeRule(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	client.Debug()
+ 	ruleList, err := client.GetNodeRule()
+@@ -151,6 +168,7 @@ func TestGetNodeRule(t *testing.T) {
+ }
+ 
+ func TestReportIllegal(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	detectResult := []api.DetectResult{
 diff --git a/api/sspanel/sspanel_test.go b/api/sspanel/sspanel_test.go
+index 30baaff..fa95bfb 100644
 --- a/api/sspanel/sspanel_test.go
 +++ b/api/sspanel/sspanel_test.go
-@@ -1,11 +1,19 @@
- package sspanel_test
+@@ -2,12 +2,20 @@ package sspanel_test
  
  import (
  	"fmt"
@@ -103,18 +369,101 @@ diff --git a/api/sspanel/sspanel_test.go b/api/sspanel/sspanel_test.go
  	"github.com/XrayR-project/XrayR/api/sspanel"
  )
  
-+func TestMain(m *testing.M) {
++func skipPanelIntegration(t *testing.T) {
++	t.Helper()
 +	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
-+		return
++		t.Skip("external panel integration disabled; set XRAYR_RUN_PANEL_INTEGRATION=1")
 +	}
-+	os.Exit(m.Run())
 +}
 +
  func CreateClient() api.API {
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:667",
+@@ -20,6 +28,7 @@ func CreateClient() api.API {
+ }
+ 
+ func TestGetV2rayNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	nodeInfo, err := client.GetNodeInfo()
+@@ -30,6 +39,7 @@ func TestGetV2rayNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetSSNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:667",
+ 		Key:      "123",
+@@ -45,6 +55,7 @@ func TestGetSSNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetTrojanNodeInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "http://127.0.0.1:667",
+ 		Key:      "123",
+@@ -60,6 +71,7 @@ func TestGetTrojanNodeInfo(t *testing.T) {
+ }
+ 
+ func TestGetSSInfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	nodeInfo, err := client.GetNodeInfo()
+@@ -70,6 +82,7 @@ func TestGetSSInfo(t *testing.T) {
+ }
+ 
+ func TestGetUserList(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	userList, err := client.GetUserList()
+@@ -81,6 +94,7 @@ func TestGetUserList(t *testing.T) {
+ }
+ 
+ func TestReportNodeStatus(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	nodeStatus := &api.NodeStatus{
+ 		CPU: 1, Mem: 1, Disk: 1, Uptime: 256,
+@@ -92,6 +106,7 @@ func TestReportNodeStatus(t *testing.T) {
+ }
+ 
+ func TestReportReportNodeOnlineUsers(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -113,6 +128,7 @@ func TestReportReportNodeOnlineUsers(t *testing.T) {
+ }
+ 
+ func TestReportReportUserTraffic(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -134,6 +150,7 @@ func TestReportReportUserTraffic(t *testing.T) {
+ }
+ 
+ func TestGetNodeRule(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	ruleList, err := client.GetNodeRule()
+@@ -145,6 +162,7 @@ func TestGetNodeRule(t *testing.T) {
+ }
+ 
+ func TestReportIllegal(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	detectResult := []api.DetectResult{
 diff --git a/api/v2raysocks/v2raysocks_test.go b/api/v2raysocks/v2raysocks_test.go
+index 76dc35f..118052e 100644
 --- a/api/v2raysocks/v2raysocks_test.go
 +++ b/api/v2raysocks/v2raysocks_test.go
-@@ -1,10 +1,18 @@
+@@ -1,12 +1,20 @@
  package v2raysocks_test
  
  import (
@@ -125,15 +474,66 @@ diff --git a/api/v2raysocks/v2raysocks_test.go b/api/v2raysocks/v2raysocks_test.
  	"github.com/XrayR-project/XrayR/api/v2raysocks"
  )
  
-+func TestMain(m *testing.M) {
++func skipPanelIntegration(t *testing.T) {
++	t.Helper()
 +	if os.Getenv("XRAYR_RUN_PANEL_INTEGRATION") != "1" {
-+		return
++		t.Skip("external panel integration disabled; set XRAYR_RUN_PANEL_INTEGRATION=1")
 +	}
-+	os.Exit(m.Run())
 +}
 +
  func CreateClient() api.API {
+ 	apiConfig := &api.Config{
+ 		APIHost:  "https://127.0.0.1/",
+@@ -19,6 +27,7 @@ func CreateClient() api.API {
+ }
+ 
+ func TestGetV2rayNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	client.Debug()
+ 	nodeInfo, err := client.GetNodeInfo()
+@@ -29,6 +38,7 @@ func TestGetV2rayNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetSSNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "https://127.0.0.1/",
+ 		Key:      "123456789",
+@@ -44,6 +54,7 @@ func TestGetSSNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetTrojanNodeinfo(t *testing.T) {
++	skipPanelIntegration(t)
+ 	apiConfig := &api.Config{
+ 		APIHost:  "https://127.0.0.1/",
+ 		Key:      "123456789",
+@@ -59,6 +70,7 @@ func TestGetTrojanNodeinfo(t *testing.T) {
+ }
+ 
+ func TestGetUserList(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 
+ 	userList, err := client.GetUserList()
+@@ -70,6 +82,7 @@ func TestGetUserList(t *testing.T) {
+ }
+ 
+ func TestReportReportUserTraffic(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	userList, err := client.GetUserList()
+ 	if err != nil {
+@@ -91,6 +104,7 @@ func TestReportReportUserTraffic(t *testing.T) {
+ }
+ 
+ func TestGetNodeRule(t *testing.T) {
++	skipPanelIntegration(t)
+ 	client := CreateClient()
+ 	client.Debug()
+ 	ruleList, err := client.GetNodeRule()
 diff --git a/common/mylego/lego_test.go b/common/mylego/lego_test.go
+index 06cff60..6b11632 100644
 --- a/common/mylego/lego_test.go
 +++ b/common/mylego/lego_test.go
 @@ -1,6 +1,7 @@
@@ -144,25 +544,32 @@ diff --git a/common/mylego/lego_test.go b/common/mylego/lego_test.go
  	"testing"
  
  	"github.com/XrayR-project/XrayR/common/mylego"
-@@ -14,4 +15,5 @@ func TestLegoClient(t *testing.T) {
+@@ -14,6 +15,7 @@ func TestLegoClient(t *testing.T) {
  }
  
  func TestLegoDNSCert(t *testing.T) {
 +	skipWithoutLegoIntegration(t)
  	lego, err := mylego.New(&mylego.CertConfig{
-@@ -37,4 +39,5 @@ func TestLegoDNSCert(t *testing.T) {
+ 		CertDomain: "node1.test.com",
+ 		Provider:   "alidns",
+@@ -37,6 +39,7 @@ func TestLegoDNSCert(t *testing.T) {
  }
  
  func TestLegoHTTPCert(t *testing.T) {
 +	skipWithoutLegoIntegration(t)
  	lego, err := mylego.New(&mylego.CertConfig{
-@@ -55,4 +58,5 @@ func TestLegoHTTPCert(t *testing.T) {
+ 		CertMode:   "http",
+ 		CertDomain: "node1.test.com",
+@@ -55,6 +58,7 @@ func TestLegoHTTPCert(t *testing.T) {
  }
  
  func TestLegoRenewCert(t *testing.T) {
 +	skipWithoutLegoIntegration(t)
  	lego, err := mylego.New(&mylego.CertConfig{
-@@ -85,2 +89,9 @@ func TestLegoRenewCert(t *testing.T) {
+ 		CertDomain: "node1.test.com",
+ 		Email:      "test@gmail.com",
+@@ -85,3 +89,10 @@ func TestLegoRenewCert(t *testing.T) {
+ 	t.Log(keyPath)
  	t.Log(ok)
  }
 +
@@ -173,9 +580,10 @@ diff --git a/common/mylego/lego_test.go b/common/mylego/lego_test.go
 +	}
 +}
 diff --git a/service/controller/controller_test.go b/service/controller/controller_test.go
+index 008171d..ec3e246 100644
 --- a/service/controller/controller_test.go
 +++ b/service/controller/controller_test.go
-@@ -19,4 +19,7 @@ import (
+@@ -19,6 +19,9 @@ import (
  )
  
  func TestController(t *testing.T) {
@@ -183,15 +591,18 @@ diff --git a/service/controller/controller_test.go b/service/controller/controll
 +		t.Skip("set XRAYR_RUN_CONTROLLER_INTEGRATION=1 to run controller integration test")
 +	}
  	serverConfig := &conf.Config{
+ 		Stats:     &conf.StatsConfig{},
+ 		LogConfig: &conf.LogConfig{LogLevel: "debug"},
 diff --git a/service/controller/inboundbuilder_test.go b/service/controller/inboundbuilder_test.go
+index a96bc3a..02daf83 100644
 --- a/service/controller/inboundbuilder_test.go
 +++ b/service/controller/inboundbuilder_test.go
-@@ -76,5 +76,7 @@ func TestBuildSS(t *testing.T) {
- 		TransportProtocol: "tcp",
+@@ -77,6 +77,8 @@ func TestBuildSS(t *testing.T) {
  		Host:              "test.test.tk",
  		Path:              "v2ray",
  		EnableTLS:         false,
 +		CypherMethod:      "aes-128-gcm",
 +		ServerKey:         "test-password",
  	}
- 	}
+ 	DNSEnv := make(map[string]string)
+ 	DNSEnv["ALICLOUD_ACCESS_KEY"] = "aaa"

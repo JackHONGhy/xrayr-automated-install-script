@@ -38,26 +38,34 @@ On the target Linux server, run the existing installation command as root:
 bash <(curl -Ls https://raw.githubusercontent.com/JackHONGhy/xrayr-automated-install-script/master/install.sh)
 ```
 
-The script downloads the matching archive, verifies its SHA-256 digest,
-extracts `/usr/local/XrayR` and `/etc/XrayR`, installs `XrayR.service`, and
-installs the existing `xrayr` manager command. It refuses packages without the
-custom build marker and preserves an existing `/etc/XrayR/config.yml`.
+The script downloads the matching archive, verifies its SHA-256 digest and
+custom build marker before it stops an existing service, then backs up the
+binary, `/etc/XrayR/config.yml`, and systemd unit. It reloads, enables, and
+restarts `XrayR`, polling `systemctl is-active --quiet XrayR` with a timeout.
+If the new service fails, it restores the previous files and attempts to bring
+the previous service back. An existing `/etc/XrayR/config.yml` is preserved.
 
 ## Package checksums
 
-- amd64: `ac6ec12d69c745ad9054b3866b531539781736cb29f12905d615a938f260e580`
-- arm64: `b2685a9b2c78065830a6e0dabcfb575ff055a6e0e76bb85d5a3b3b54334421a5`
+- amd64: `f771409273e716aa821db42011343d3ac4a2b3465c986073a8dbe081147bcd9b`
+- arm64: `31f1499429ae1a587566fd44291c402614faadda1176bdfd9430a1156645998b`
 
 ```bash
 sha256sum -c SHA256SUMS
 ```
+
+`SHA256SUMS` is committed as LF-only text. On Linux, verify both its line
+endings and package contents with `file SHA256SUMS`, `grep -n $'\r'
+SHA256SUMS`, and the checksum command above; the `grep` command must produce
+no output.
 
 ## Configuration and management
 
 The default configuration remains `/etc/XrayR/config.yml`; this release does
 not overwrite a user's configuration during install or update. The manager's
 install, update, and self-update paths download only this repository's custom
-packages and refuse missing or unmarked packages.
+packages and refuse missing or unmarked packages. `XrayR update x.x.x` is
+explicitly rejected: this repository installs only the fixed customized build.
 
 ## Rebuild
 

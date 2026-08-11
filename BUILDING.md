@@ -2,8 +2,9 @@
 
 This repository publishes XrayR `0.9.4` packages from fixed source revisions.
 It retains the existing xray-core QUIC safety patch and adds a separate
-NewV2board online-device patch. A third, test-only patch gates historical
-external-panel/ACME/controller tests behind explicit environment variables. It
+NewV2board online-device patch. A third, test-only patch marks only historical
+external-panel/ACME/controller integration tests with explicit environment
+variables; ordinary unit and httptest cases still run by default. It
 does not upgrade xray-core or replace the customized XrayR with V2bX.
 
 Fixed source revisions:
@@ -75,10 +76,14 @@ go test -fuzz=FuzzSniffQUIC -fuzztime=30s ./common/protocol/quic
 go vet ./...
 git diff --check
 bash scripts/check-update-protection.sh
+bash scripts/test-install-flow.sh
+sha256sum -c SHA256SUMS
 ```
 
-The NewV2board tests use `httptest`. Historical panel tests require
-`XRAYR_RUN_PANEL_INTEGRATION=1`, ACME tests require
+The NewV2board tests use `httptest` and always run. Historical panel tests
+require `XRAYR_RUN_PANEL_INTEGRATION=1`, ACME tests require
 `XRAYR_RUN_LEGO_INTEGRATION=1`, and the controller integration test requires
 `XRAYR_RUN_CONTROLLER_INTEGRATION=1`. The default full test run is offline and
-does not contact panels, ACME, or a runtime service.
+does not contact panels, ACME, or a runtime service; each skipped external test
+reports its own name and opt-in reason. `scripts/test-install-flow.sh` uses a
+temporary root and mocked systemd commands, never the host service.

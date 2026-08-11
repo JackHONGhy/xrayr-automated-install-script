@@ -71,11 +71,13 @@ clone_at_commit() {
       exit 1
     }
     mkdir -p "${dir}"
-    git -c safe.directory="${repo_dir}" -C "${repo_dir}" archive --format=tar "${commit}" | tar -xf - -C "${dir}"
+    local dir_abs
+    dir_abs="$(cd "${dir}" && pwd)"
+    git -c safe.directory="${repo_dir}" -C "${repo_dir}" archive --format=tar "${commit}" | tar -xf - -C "${dir_abs}"
     # Keep the extracted tree usable by git apply/diff without fabricating a
     # commit that could be mistaken for the pinned upstream revision.
-    git init -q "${dir}"
-    git -C "${dir}" add -A
+    git init -q "${dir_abs}"
+    git -c safe.directory="${dir_abs}" -C "${dir_abs}" add -A
   else
     git clone --filter=blob:none --no-checkout "${repo}" "${dir}"
     git -C "${dir}" fetch --depth 1 origin "${commit}"
@@ -90,11 +92,13 @@ clone_at_commit() {
 
 clone_at_commit "${XRAYR_REPO}" "${XRAYR_COMMIT}" "${XRAYR_DIR}"
 clone_at_commit "${CORE_REPO}" "${CORE_COMMIT}" "${CORE_DIR}"
+XRAYR_GIT_DIR="$(cd "${XRAYR_DIR}" && pwd)"
+CORE_GIT_DIR="$(cd "${CORE_DIR}" && pwd)"
 # Apply the existing custom xray-core patch first, then the online-device
 # patch to the final XrayR source tree. Never build an unpatched upstream tree.
-git -C "${CORE_DIR}" apply --whitespace=nowarn "${PATCH_FILE}"
-git -C "${XRAYR_DIR}" apply --whitespace=nowarn "${ONLINE_PATCH_FILE}"
-git -C "${XRAYR_DIR}" apply --whitespace=nowarn "${TEST_PATCH_FILE}"
+git -c safe.directory="${CORE_GIT_DIR}" -C "${CORE_GIT_DIR}" apply --whitespace=nowarn "${PATCH_FILE}"
+git -c safe.directory="${XRAYR_GIT_DIR}" -C "${XRAYR_GIT_DIR}" apply --whitespace=nowarn "${ONLINE_PATCH_FILE}"
+git -c safe.directory="${XRAYR_GIT_DIR}" -C "${XRAYR_GIT_DIR}" apply --whitespace=nowarn "${TEST_PATCH_FILE}"
 
 "${GOFMT_BIN}" -w \
   "${CORE_DIR}/common/protocol/quic/sniff.go" \
@@ -111,8 +115,8 @@ git -C "${XRAYR_DIR}" apply --whitespace=nowarn "${TEST_PATCH_FILE}"
   "${XRAYR_DIR}/common/mylego/lego_test.go" \
   "${XRAYR_DIR}/service/controller/controller_test.go" \
   "${XRAYR_DIR}/service/controller/inboundbuilder_test.go"
-git -C "${CORE_DIR}" diff --check
-git -C "${XRAYR_DIR}" diff --check
+git -c safe.directory="${CORE_GIT_DIR}" -C "${CORE_GIT_DIR}" diff --check
+git -c safe.directory="${XRAYR_GIT_DIR}" -C "${XRAYR_GIT_DIR}" diff --check
 grep -Fq "maxCryptoDataLength" "${CORE_DIR}/common/protocol/quic/sniff.go" || {
   echo "Existing QUIC sniff patch is missing from the final source tree" >&2
   exit 1
@@ -134,7 +138,7 @@ if [[ -d "${XRAYR_REPO}/.git" || -f "${XRAYR_REPO}/HEAD" ]]; then
   XRAYR_SOURCE_DIR="$(cd "${XRAYR_REPO}" && pwd)"
   SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -c safe.directory="${XRAYR_SOURCE_DIR}" -C "${XRAYR_SOURCE_DIR}" show -s --format=%ct "${XRAYR_COMMIT}")}"
 else
-  SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "${XRAYR_DIR}" show -s --format=%ct "${XRAYR_COMMIT}")}"
+  SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -c safe.directory="${XRAYR_GIT_DIR}" -C "${XRAYR_GIT_DIR}" show -s --format=%ct "${XRAYR_COMMIT}")}"
 fi
 
 (

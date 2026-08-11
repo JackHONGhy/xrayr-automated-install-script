@@ -11,6 +11,26 @@ custom_branch="${XRAYR_BRANCH:-master}"
 custom_build_id="xrayr-0.9.4-quicfix.1-online.1"
 custom_installer_url="${XRAYR_INSTALLER_URL:-https://raw.githubusercontent.com/${custom_repo}/${custom_branch}/install.sh}"
 
+wait_for_active() {
+    local deadline=$((SECONDS + ${XRAYR_SERVICE_TIMEOUT:-30}))
+    while [[ ${SECONDS} -lt ${deadline} ]]; do
+        systemctl is-active --quiet XrayR && return 0
+        sleep 1
+    done
+    return 1
+}
+
+wait_for_inactive() {
+    local deadline=$((SECONDS + ${XRAYR_SERVICE_TIMEOUT:-30}))
+    while [[ ${SECONDS} -lt ${deadline} ]]; do
+        if ! systemctl is-active --quiet XrayR; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误: ${plain} 必须使用root用户运行此脚本！\n" && exit 1
 
@@ -109,11 +129,11 @@ run_custom_installer() {
 
 install() {
     if run_custom_installer; then
-        if [[ $# == 0 ]]; then
-            start
-        else
-            start 0
+        if ! systemctl is-active --quiet XrayR || ! wait_for_active; then
+            echo -e "${red}安装脚本未能确认 XrayR 已启动，拒绝显示成功${plain}" >&2
+            return 1
         fi
+        echo -e "${green}安装完成，XrayR 已自动重启${plain}"
     fi
 }
 
@@ -123,6 +143,10 @@ update() {
     else
         version=$2
     fi
+    if [[ -n "${version:-}" ]]; then
+        echo -e "${red}本仓库只发布固定定制版本 ${custom_build_id}，不支持任意版本号: ${version}${plain}" >&2
+        return 1
+    fi
 #    confirm "本功能会强制重装当前最新版，数据不会丢失，是否继续?" "n"
 #    if [[ $? != 0 ]]; then
 #        echo -e "${red}已取消${plain}"
@@ -131,7 +155,11 @@ update() {
 #        fi
 #        return 0
 #    fi
-    if run_custom_installer "$version"; then
+    if run_custom_installer; then
+        if ! systemctl is-active --quiet XrayR || ! wait_for_active; then
+            echo -e "${red}更新脚本未能确认 XrayR 已启动，未报告更新成功${plain}" >&2
+            return 1
+        fi
         echo -e "${green}更新完成，已自动重启 XrayR，请使用 XrayR log 查看运行日志${plain}"
         exit
     fi
@@ -144,7 +172,6 @@ update() {
 config() {
     echo "XrayR在修改配置后会自动尝试重启"
     vi /etc/XrayR/config.yml
-    sleep 2
     check_status
     case $? in
         0)
@@ -195,9 +222,7 @@ start() {
         echo -e "${green}XrayR已运行，无需再次启动，如需重启请选择重启${plain}"
     else
         systemctl start XrayR
-        sleep 2
-        check_status
-        if [[ $? == 0 ]]; then
+        if wait_for_active; then
             echo -e "${green}XrayR 启动成功，请使用 XrayR log 查看运行日志${plain}"
         else
             echo -e "${red}XrayR可能启动失败，请稍后使用 XrayR log 查看日志信息${plain}"
@@ -210,13 +235,11 @@ start() {
 }
 
 stop() {
-    systemctl stop XrayR
-    sleep 2
-    check_status
-    if [[ $? == 1 ]]; then
+    if systemctl stop XrayR && wait_for_inactive; then
         echo -e "${green}XrayR 停止成功${plain}"
     else
-        echo -e "${red}XrayR停止失败，可能是因为停止时间超过了两秒，请稍后查看日志信息${plain}"
+        echo -e "${red}XrayR停止失败，请查看日志信息${plain}"
+        return 1
     fi
 
     if [[ $# == 0 ]]; then
@@ -225,14 +248,14 @@ stop() {
 }
 
 restart() {
-    systemctl restart XrayR
-    sleep 2
-    check_status
-    if [[ $? == 0 ]]; then
+    if systemctl restart XrayR && wait_for_active; then
         echo -e "${green}XrayR 重启成功，请使用 XrayR log 查看运行日志${plain}"
+        result=0
     else
         echo -e "${red}XrayR可能启动失败，请稍后使用 XrayR log 查看日志信息${plain}"
+        result=1
     fi
+    [[ ${result} -eq 0 ]] || return 1
     if [[ $# == 0 ]]; then
         before_show_menu
     fi

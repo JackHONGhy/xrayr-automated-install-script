@@ -1,0 +1,30 @@
+name: Linux release verification
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  installer-and-checksum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell syntax and update safeguards
+        run: |
+          bash -n install.sh
+          bash -n xrayr-manager.sh
+          bash -n scripts/check-update-protection.sh
+          bash -n scripts/test-install-flow.sh
+          bash scripts/check-update-protection.sh
+      - name: Verify LF-only checksum manifest and release archives
+        run: |
+          file SHA256SUMS
+          ! grep -n $'\r' SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Exercise safe installer state transitions without host systemd
+        run: bash scripts/test-install-flow.sh
