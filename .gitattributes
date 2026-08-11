@@ -1,6 +1,8 @@
 *.sh text eol=lf
 *.md text eol=lf
 SHA256SUMS text eol=lf
+.github/workflows/linux-release-verify.yml text eol=lf
+scripts/verify-customized-source.sh text eol=lf
 
 # A unified diff intentionally contains context lines beginning with a marker
 # space followed by Go indentation. Do not treat that patch payload as source

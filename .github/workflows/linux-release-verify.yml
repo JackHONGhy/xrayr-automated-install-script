@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  customized-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.12'
+          cache: false
+      - name: Verify final customized XrayR source tree
+        run: bash scripts/verify-customized-source.sh
+
   installer-and-checksum:
     runs-on: ubuntu-latest
     steps:
